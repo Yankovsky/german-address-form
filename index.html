@@ -1,0 +1,234 @@
+<html>
+<head>
+  <meta charset="UTF-8">
+  <style>
+    @keyframes spin {
+      0% {
+        transform: rotateZ(0);
+      }
+      100% {
+        transform: rotateZ(360deg);
+      }
+    }
+
+    form {
+      border: 1px dashed black;
+      padding: 16px;
+      width: 300px;
+      display: grid;
+      grid-template-columns: auto auto;
+      grid-gap: 8px;
+    }
+
+    .loader {
+      display: inline-block;
+      font-family: monospace;
+      transition: opacity 0.1s;
+      opacity: 0;
+    }
+
+    .loading {
+      opacity: 1;
+      animation: spin 1s linear infinite;
+    }
+
+    label {
+      text-align: right;
+    }
+
+    label::after {
+      content: ':';
+    }
+
+    .street-suggest {
+      position: relative;
+    }
+
+    .suggestions {
+      position: absolute;
+      background: white;
+      border: 1px solid black;
+      padding: 4px;
+      transition: opacity 0.1s;
+      width: 150px;
+    }
+
+    .suggestions > * {
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      overflow: hidden;
+    }
+
+    .suggestions:empty {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    button {
+      grid-column: 1/3;
+    }
+  </style>
+
+</head>
+<body>
+<p><b>40721</b> Hilden, Düsseldorf (Johann-Vaillant-Straße 4)</p>
+<p><b>14532</b> Stahnsdorf, Kleinmachnow (Ruhlsdorfer Str. 30)</p>
+<p><b>46049</b> Oberhausen, Mülheim an der Ruhr (Duisburger Str. 380)</p>
+<p><b>12347</b> Berlin (Hannemannstraße 67)</p>
+<p><b>50668</b> Köln (Schillingstraße 36)</p>
+<p><b>19053</b> Schwerin (Lennéstraße 1) it is a castle</p>
+<p><b>15234</b> Frankfurt (Oder) (Max-Hannemann-Straße 5)</p>
+<form>
+  <label for="postal">PLZ</label>
+  <div>
+    <input id="postal" type="text" autocomplete="postal-code">
+    <span id="postalLoading" class="loader">C</span>
+  </div>
+  <label for="city">Ort</label>
+  <input id="city" type="text">
+  <label for="street">Straße</label>
+  <div class="street-suggest">
+    <input id="street" type="text">
+    <div id="suggestions" class="suggestions"></div>
+  </div>
+  <label for="houseNumber">Nummer</label>
+  <input id="houseNumber" type="text">
+
+  <button>Submit <span id="formSubmitting" class="loader">C</span></button>
+</form>
+<div class="errorMessage"></div>
+<script>
+  const key = 'KKhOPYGhcA6k6iGH2r2TMwvjh5WJQg2L'
+
+  const postalInput = document.getElementById('postal')
+  const cityInput = document.getElementById('city')
+  const streetInput = document.getElementById('street')
+  const houseNumberInput = document.getElementById('houseNumber')
+  const postalLoading = document.getElementById('postalLoading')
+  const errorMessage = document.getElementsByClassName('errorMessage')[0]
+  const form = document.getElementsByTagName('form')[0]
+  const formSubmitting = document.getElementById('formSubmitting')
+  const suggestions = document.getElementById('suggestions')
+
+  let cityTouched = false
+
+  const onPostalCodeChange = async (e) => {
+    errorMessage.innerHTML = ''
+    const postalCode = e.target.value
+    if (postalCode.length === 5) {
+      postalLoading.classList.add('loading')
+      const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=10&entityTypeSet=PostalCodeArea&view=Unified&key=${ key }&postalCode=${ postalCode }`
+      const request = fetch(url)
+      const data = await request.then(response => response.json())
+      if (data.results.length === 0) {
+        errorMessage.innerHTML = '<span style="color: red">Postal code doesn\'t exist</span>'
+      } else {
+        const municipality = data.results[0].address.municipality
+        const cities = municipality.split(', ')
+        if (!cityTouched) {
+          if (cities.length === 1) {
+            cityInput.value = municipality
+          } else {
+            cityInput.value = ''
+          }
+        }
+      }
+      postalLoading.classList.remove('loading')
+    }
+  }
+
+  const onCityTouched = () => {
+    cityTouched = true
+  }
+
+  const selectStreet = (e) => {
+    streetInput.value = e.target.innerHTML
+  }
+
+  const onStreetChange = async (e) => {
+    const street = e.target.value
+    if (street.length >= 2) {
+      const postalCode = postalInput.value
+      const city = cityInput.value
+      const queryParts = [street]
+      if (postalCode) {
+        queryParts.push(postalCode)
+      }
+      if (city) {
+        queryParts.push(city)
+      }
+      const query = encodeURIComponent(queryParts.join(' '))
+      const url = `https://api.tomtom.com/search/2/search/${ query }.json?typeahead=true&limit=10&countrySet=DE&extendedPostalCodesFor=PAD%2CStr&minFuzzyLevel=1&maxFuzzyLevel=2&idxSet=PAD%2CStr&view=Unified&relatedPois=off&key=${ key }`
+      const request = fetch(url)
+      const data = await request.then(response => response.json())
+      const streetsSuggestion = data.results
+        .filter(result => {
+          const resultPostalCode = result.postalCode
+          const resultMunicipality = result.municipality
+          if (resultPostalCode && !resultPostalCode.includes(postalCode)) {
+            return false
+          }
+          if (resultMunicipality && !resultMunicipality.includes(city)) {
+            return false
+          }
+          return true
+        })
+        .map(result => result.address.streetName)
+      suggestions.innerHTML = ''
+      streetsSuggestion.forEach(x => {
+        const div = document.createElement('div')
+        div.addEventListener('click', selectStreet)
+        div.innerHTML = x
+        suggestions.appendChild(div)
+      })
+    }
+  }
+
+  const onSubmit = async (e) => {
+    errorMessage.innerHTML = ''
+    e.preventDefault()
+    const postal = postalInput.value
+    const city = cityInput.value
+    const street = streetInput.value
+    const house = houseNumberInput.value
+    if (postal && city && street && house) {
+      formSubmitting.classList.add('loading')
+
+      const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=1&streetNumber=${ house }&streetName=${ street }&municipality=${ city }&postalCode=${ postal }&view=Unified&key=${ key }`
+      const request = fetch(url)
+      const data = await request.then(response => response.json())
+      if (data.results.length === 0) {
+        errorMessage.innerHTML = '<span style="color: red">Bad address</span>'
+      } else {
+        const result = data.results[0]
+        const resultPostalCode = result.postalCode
+        const resultMunicipality = result.municipality
+        if (!resultPostalCode || !resultPostalCode.includes(postalCode)) {
+          errorMessage.innerHTML = '<span style="color: red">Postal code doesn\'t match for this address</span>'
+        }
+        if (!resultMunicipality || !resultMunicipality.includes(city)) {
+          errorMessage.innerHTML = '<span style="color: red">City doesn\'t match for this address</span>'
+        }
+        if (data.results[0].type !== 'Point Address') {
+          errorMessage.innerHTML = '<span style="color: orange">Postal and city are fine, but can\'t find the address</span>'
+        } else {
+          errorMessage.innerHTML = '<span style="color: green">Nice</span>'
+        }
+      }
+      formSubmitting.classList.remove('loading')
+    }
+    return false
+  }
+
+  postalInput.addEventListener('input', onPostalCodeChange)
+  cityInput.addEventListener('input', onCityTouched)
+  streetInput.addEventListener('input', onStreetChange)
+  streetInput.addEventListener('blur', () => {
+    setTimeout(() => suggestions.innerHTML = '', 300)
+  })
+  form.addEventListener('submit', onSubmit)
+</script>
+</body>
+</html>
+
+
