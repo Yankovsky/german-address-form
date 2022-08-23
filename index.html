@@ -187,29 +187,27 @@
   const onSubmit = async (e) => {
     errorMessage.innerHTML = ''
     e.preventDefault()
-    const postal = postalInput.value
+    const postalCode = postalInput.value
     const city = cityInput.value
     const street = streetInput.value
     const house = houseNumberInput.value
-    if (postal && city && street && house) {
+    if (postalCode && city && street && house) {
       formSubmitting.classList.add('loading')
 
-      const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=1&streetNumber=${ house }&streetName=${ street }&municipality=${ city }&postalCode=${ postal }&view=Unified&key=${ key }`
+      const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=1&streetNumber=${ house }&streetName=${ street }&municipality=${ city }&postalCode=${ postalCode }&view=Unified&key=${ key }`
       const request = fetch(url)
       const data = await request.then(response => response.json())
       if (data.results.length === 0) {
         errorMessage.innerHTML = '<span style="color: red">Bad address</span>'
       } else {
-        const result = data.results[0]
+        const result = data.results[0].address
         const resultPostalCode = result.postalCode
         const resultMunicipality = result.municipality
         if (!resultPostalCode || !resultPostalCode.includes(postalCode)) {
           errorMessage.innerHTML = '<span style="color: red">Postal code doesn\'t match for this address</span>'
-        }
-        if (!resultMunicipality || !resultMunicipality.includes(city)) {
+        } else if (!resultMunicipality || !resultMunicipality.includes(city)) {
           errorMessage.innerHTML = '<span style="color: red">City doesn\'t match for this address</span>'
-        }
-        if (data.results[0].type !== 'Point Address') {
+        } else if (data.results[0].type !== 'Point Address') {
           errorMessage.innerHTML = '<span style="color: orange">Postal and city are fine, but can\'t find the address</span>'
         } else {
           errorMessage.innerHTML = '<span style="color: green">Nice</span>'
