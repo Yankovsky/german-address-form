@@ -142,8 +142,8 @@
     cityTouched = true
   }
 
-  const selectStreet = (e) => {
-    streetInput.value = e.target.innerHTML
+  const selectStreet = (address) => () => {
+    streetInput.value = address.streetName
   }
 
   const onStreetChange = async (e) => {
@@ -175,12 +175,12 @@
           }
           return true
         })
-        .map(result => result.address.freeformAddress)
+        .map(result => result.address)
       suggestions.innerHTML = ''
-      streetsSuggestion.forEach(x => {
+      streetsSuggestion.forEach(address => {
         const div = document.createElement('div')
-        div.addEventListener('click', selectStreet)
-        div.innerHTML = x
+        div.addEventListener('click', selectStreet(address))
+        div.innerHTML = address.freeformAddress
         suggestions.appendChild(div)
       })
     }
