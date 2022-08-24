@@ -14,10 +14,15 @@
     form {
       border: 1px dashed black;
       padding: 16px;
-      width: 300px;
-      display: grid;
-      grid-template-columns: auto auto;
-      grid-gap: 8px;
+      width: 200px;
+    }
+
+    input, button {
+      width: 100%;
+    }
+
+    button {
+      margin-top: 4px;
     }
 
     .loader {
@@ -63,14 +68,11 @@
       opacity: 0;
       pointer-events: none;
     }
-
-    button {
-      grid-column: 1/3;
-    }
   </style>
 
 </head>
 <body>
+<h1>One field</h1>
 <p><b>40721</b> Hilden, Düsseldorf (Johann-Vaillant-Straße 4)</p>
 <p><b>14532</b> Stahnsdorf, Kleinmachnow (Ruhlsdorfer Str. 30)</p>
 <p><b>46049</b> Oberhausen, Mülheim an der Ruhr (Duisburger Str. 380)</p>
@@ -79,67 +81,21 @@
 <p><b>19053</b> Schwerin (Lennéstraße 1) it is a castle</p>
 <p><b>15234</b> Frankfurt (Oder) (Max-Hannemann-Straße 5)</p>
 <form>
-  <label for="postal">PLZ</label>
-  <div>
-    <input id="postal" type="text" autocomplete="postal-code">
-    <span id="postalLoading" class="loader">C</span>
-  </div>
-  <label for="city">Ort</label>
-  <input id="city" type="text">
-  <label for="street">Straße</label>
   <div class="street-suggest">
     <input id="street" type="text">
     <div id="suggestions" class="suggestions"></div>
   </div>
-  <label for="houseNumber">Nummer</label>
-  <input id="houseNumber" type="text">
-
   <button>Submit <span id="formSubmitting" class="loader">C</span></button>
 </form>
 <div class="errorMessage"></div>
 <script>
   const key = 'KKhOPYGhcA6k6iGH2r2TMwvjh5WJQg2L'
 
-  const postalInput = document.getElementById('postal')
-  const cityInput = document.getElementById('city')
   const streetInput = document.getElementById('street')
-  const houseNumberInput = document.getElementById('houseNumber')
-  const postalLoading = document.getElementById('postalLoading')
   const errorMessage = document.getElementsByClassName('errorMessage')[0]
   const form = document.getElementsByTagName('form')[0]
   const formSubmitting = document.getElementById('formSubmitting')
   const suggestions = document.getElementById('suggestions')
-
-  let cityTouched = false
-
-  const onPostalCodeChange = async (e) => {
-    errorMessage.innerHTML = ''
-    const postalCode = e.target.value
-    if (postalCode.length === 5) {
-      postalLoading.classList.add('loading')
-      const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=10&entityTypeSet=PostalCodeArea&view=Unified&key=${ key }&postalCode=${ postalCode }`
-      const request = fetch(url)
-      const data = await request.then(response => response.json())
-      if (data.results.length === 0) {
-        errorMessage.innerHTML = '<span style="color: red">Postal code doesn\'t exist</span>'
-      } else {
-        const municipality = data.results[0].address.municipality
-        const cities = municipality.split(', ')
-        if (!cityTouched) {
-          if (cities.length === 1) {
-            cityInput.value = municipality
-          } else {
-            cityInput.value = ''
-          }
-        }
-      }
-      postalLoading.classList.remove('loading')
-    }
-  }
-
-  const onCityTouched = () => {
-    cityTouched = true
-  }
 
   const selectStreet = (e) => {
     streetInput.value = e.target.innerHTML
@@ -148,18 +104,7 @@
   const onStreetChange = async (e) => {
     const street = e.target.value
     if (street.length >= 2) {
-      const postalCode = postalInput.value
-      const city = cityInput.value
-      const queryParts = []
-      if (postalCode) {
-        queryParts.push(postalCode)
-      }
-      if (city) {
-        queryParts.push(city)
-      }
-      queryParts.push(street)
-      const query = encodeURIComponent(queryParts.join(' '))
-      const url = `https://api.tomtom.com/search/2/search/${ query }.json?typeahead=true&limit=10&countrySet=DE&extendedPostalCodesFor=PAD%2CStr&minFuzzyLevel=1&maxFuzzyLevel=2&idxSet=PAD%2CStr&view=Unified&relatedPois=off&key=${ key }`
+      const url = `https://api.tomtom.com/search/2/search/${ encodeURIComponent(street) }.json?typeahead=true&limit=10&countrySet=DE&extendedPostalCodesFor=PAD%2CStr&minFuzzyLevel=1&maxFuzzyLevel=2&idxSet=PAD%2CStr&view=Unified&relatedPois=off&key=${ key }`
       const request = fetch(url)
       const data = await request.then(response => response.json())
       const streetsSuggestion = data.results
@@ -188,11 +133,8 @@
   const onSubmit = async (e) => {
     errorMessage.innerHTML = ''
     e.preventDefault()
-    const postalCode = postalInput.value
-    const city = cityInput.value
     const street = streetInput.value
-    const house = houseNumberInput.value
-    if (postalCode && city && street && house) {
+    if (street) {
       formSubmitting.classList.add('loading')
 
       const url = `https://api.tomtom.com/search/2/structuredGeocode.json?countryCode=DE&limit=1&streetNumber=${ house }&streetName=${ street }&municipality=${ city }&postalCode=${ postalCode }&view=Unified&key=${ key }`
@@ -219,8 +161,6 @@
     return false
   }
 
-  postalInput.addEventListener('input', onPostalCodeChange)
-  cityInput.addEventListener('input', onCityTouched)
   streetInput.addEventListener('input', onStreetChange)
   streetInput.addEventListener('blur', () => {
     setTimeout(() => suggestions.innerHTML = '', 300)
